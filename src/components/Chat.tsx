@@ -9,20 +9,20 @@ interface Message {
   content: string;
 }
 
-// Respostas pré-configuradas para teste
-const RESPOSTAS_PRE_CONFIGURADAS = [
-  "Olá! Sou o assistente especializado em DSM. Como posso ajudar você hoje?",
-  "O DSM (Manual Diagnóstico e Estatístico de Transtornos Mentais) é o principal guia diagnóstico para profissionais de saúde mental. A versão atual é o DSM-5-TR.",
-  "Existem 20 capítulos principais no DSM-5-TR, cada um cobrindo diferentes categorias de transtornos mentais. Posso detalhar algum específico se você desejar.",
-  "Uma das principais mudanças do DSM-5 para o DSM-5-TR foi a inclusão do diagnóstico de Luto Prolongado como um novo transtorno.",
-];
+interface WebhookResponse {
+  response?: string;
+  error?: string;
+  message?: string; // Para mensagens de erro do n8n
+  output?: string;  // Para a resposta direta do n8n
+}
 
-let respostaAtual = 0;
+const WEBHOOK_URL = 'https://primary-production-c25e.up.railway.app/webhook/cf944c6e-132b-4309-9646-967e221b6d82';
 
 export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [webhookError, setWebhookError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -33,14 +33,75 @@ export default function Chat() {
     scrollToBottom();
   }, [messages]);
 
-  const simularResposta = async () => {
-    // Simula um tempo de resposta natural (entre 1 e 2 segundos)
-    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 1000));
+  const processarRespostaWebhook = (data: WebhookResponse): WebhookResponse => {
+    // Se a resposta vier no formato array com output
+    if (Array.isArray(data) && data[0]?.output) {
+      return { response: data[0].output };
+    }
     
-    const resposta = RESPOSTAS_PRE_CONFIGURADAS[respostaAtual];
-    respostaAtual = (respostaAtual + 1) % RESPOSTAS_PRE_CONFIGURADAS.length;
-    
-    return resposta;
+    // Se vier uma mensagem de erro do n8n
+    if (data.message && data.message.includes('Error')) {
+      return { error: 'Houve um erro no processamento da sua mensagem. Por favor, tente novamente.' };
+    }
+
+    // Se vier no formato response direto
+    if (data.response) {
+      return data;
+    }
+
+    // Se vier no formato output direto
+    if (data.output) {
+      return { response: data.output };
+    }
+
+    // Se não conseguir identificar o formato
+    return { error: 'Formato de resposta não reconhecido' };
+  };
+
+  const enviarParaWebhook = async (mensagem: string): Promise<WebhookResponse> => {
+    try {
+      console.log('Enviando para webhook:', mensagem);
+      
+      const response = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          message: mensagem,
+          timestamp: new Date().toISOString(),
+          source: 'dsm-app-chat'
+        }),
+      });
+
+      console.log('Resposta do webhook:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Erro do webhook:', errorText);
+        
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.message) {
+            throw new Error(errorJson.message);
+          }
+        } catch (e) {
+          // Se não conseguir parsear o JSON, usa o texto original
+        }
+        
+        throw new Error(`Erro ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('Dados do webhook:', data);
+      
+      return processarRespostaWebhook(data);
+    } catch (error) {
+      console.error('Erro detalhado ao enviar para webhook:', error);
+      setWebhookError(error instanceof Error ? error.message : 'Erro ao enviar mensagem');
+      return { error: 'Falha na comunicação com o assistente. Por favor, tente novamente.' };
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,13 +112,26 @@ export default function Chat() {
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
+    setWebhookError(null);
 
     try {
-      const resposta = await simularResposta();
-      const assistantMessage = { role: 'assistant' as const, content: resposta };
-      setMessages(prev => [...prev, assistantMessage]);
+      const webhookResponse = await enviarParaWebhook(userMessage.content);
+      
+      if (webhookResponse.error) {
+        setWebhookError(webhookResponse.error);
+        return;
+      }
+
+      if (webhookResponse.response) {
+        const assistantMessage = { 
+          role: 'assistant' as const, 
+          content: webhookResponse.response 
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+      }
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
+      console.error('Erro ao processar mensagem:', error);
+      setWebhookError('Ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.');
     } finally {
       setIsLoading(false);
     }
@@ -66,6 +140,12 @@ export default function Chat() {
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       <div className="flex-1 overflow-y-auto p-4 space-y-4" id="chat-messages">
+        {webhookError && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+            <strong className="font-bold">Erro: </strong>
+            <span className="block sm:inline">{webhookError}</span>
+          </div>
+        )}
         {messages.map((message, index) => (
           <div
             key={index}
