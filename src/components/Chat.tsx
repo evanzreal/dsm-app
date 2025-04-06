@@ -14,8 +14,15 @@ interface WebhookResponse {
   error?: string;
   message?: string;
   output?: string;
-  data?: any;
+  data?: unknown;
 }
+
+// Tipo para representar uma resposta do webhook, que pode ser de vários formatos
+type WebhookData = 
+  | string 
+  | Record<string, unknown>
+  | Array<Record<string, unknown> | string>
+  | { output?: string; response?: string; message?: string; error?: string; };
 
 const WEBHOOK_URL = 'https://primary-production-c25e.up.railway.app/webhook-test/cf944c6e-132b-4309-9646-967e221b6d82';
 const MAX_RETRIES = 2;
@@ -37,7 +44,7 @@ export default function Chat() {
   }, [messages]);
 
   // Função melhorada para processar a resposta do webhook
-  const processarRespostaWebhook = (data: any): WebhookResponse => {
+  const processarRespostaWebhook = (data: WebhookData): WebhookResponse => {
     console.log('Processando resposta do webhook:', JSON.stringify(data));
 
     // Caso 1: Array de respostas (comum em algumas APIs)
@@ -45,9 +52,14 @@ export default function Chat() {
       console.log('Resposta é um array, tentando extrair conteúdo');
       if (data.length > 0) {
         const primeiroItem = data[0];
-        if (primeiroItem.output) return { response: primeiroItem.output };
-        if (primeiroItem.response) return { response: primeiroItem.response };
-        if (primeiroItem.message) return { response: primeiroItem.message };
+        if (typeof primeiroItem === 'object' && primeiroItem !== null) {
+          if ('output' in primeiroItem && typeof primeiroItem.output === 'string') 
+            return { response: primeiroItem.output };
+          if ('response' in primeiroItem && typeof primeiroItem.response === 'string') 
+            return { response: primeiroItem.response };
+          if ('message' in primeiroItem && typeof primeiroItem.message === 'string') 
+            return { response: primeiroItem.message };
+        }
         if (typeof primeiroItem === 'string') return { response: primeiroItem };
         console.log('Não conseguiu extrair resposta do array:', primeiroItem);
       }
@@ -55,25 +67,29 @@ export default function Chat() {
 
     // Caso 2: Detecção de erros
     if (typeof data === 'object' && data !== null) {
-      if (data.error) return { error: data.error };
-      if (data.message && typeof data.message === 'string' && 
+      if ('error' in data && typeof data.error === 'string') 
+        return { error: data.error };
+      
+      if ('message' in data && typeof data.message === 'string' && 
           (data.message.includes('Error') || data.message.includes('erro'))) {
         return { error: data.message };
       }
     }
 
     // Caso 3: Formato padrão
-    if (data && data.response) {
+    if (typeof data === 'object' && data !== null && 'response' in data && 
+        typeof data.response === 'string') {
       return { response: data.response };
     }
 
     // Caso 4: Formato alternativo
-    if (data && data.output) {
+    if (typeof data === 'object' && data !== null && 'output' in data && 
+        typeof data.output === 'string') {
       return { response: data.output };
     }
 
     // Caso 5: Objeto simples
-    if (data && typeof data === 'object' && Object.keys(data).length === 1) {
+    if (typeof data === 'object' && data !== null && Object.keys(data).length === 1) {
       const valor = Object.values(data)[0];
       if (typeof valor === 'string') {
         return { response: valor };
@@ -94,13 +110,13 @@ export default function Chat() {
   };
 
   // Função para retentar requisições com um delay
-  const retryWithDelay = (fn: () => Promise<any>, retries: number): Promise<any> => {
+  const retryWithDelay = <T,>(fn: () => Promise<T>, retries: number): Promise<T> => {
     return fn().catch(error => {
       if (retries <= 0) {
         throw error;
       }
       console.log(`Tentativa falhou, retentando em ${RETRY_DELAY}ms... Tentativas restantes: ${retries}`);
-      return new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+      return new Promise<void>(resolve => setTimeout(resolve, RETRY_DELAY))
         .then(() => retryWithDelay(fn, retries - 1));
     });
   };
@@ -134,10 +150,10 @@ export default function Chat() {
         
         // Tenta analisar o erro como JSON
         try {
-          const errorJson = JSON.parse(errorText);
+          const errorJson = JSON.parse(errorText) as Record<string, unknown>;
           console.log('Erro analisado como JSON:', errorJson);
           
-          if (errorJson.message) {
+          if (typeof errorJson.message === 'string') {
             throw new Error(errorJson.message);
           }
         } catch (parseError) {
@@ -163,7 +179,7 @@ export default function Chat() {
       }
       
       // Tenta parsear como JSON
-      let data;
+      let data: WebhookData;
       try {
         data = JSON.parse(responseText);
         console.log('Resposta parseada com sucesso como JSON:', data);
