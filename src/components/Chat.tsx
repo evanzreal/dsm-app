@@ -14,9 +14,12 @@ interface WebhookResponse {
   error?: string;
   message?: string;
   output?: string;
+  data?: any;
 }
 
 const WEBHOOK_URL = 'https://primary-production-c25e.up.railway.app/webhook-test/cf944c6e-132b-4309-9646-967e221b6d82';
+const MAX_RETRIES = 2;
+const RETRY_DELAY = 1000; // 1 segundo
 
 export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -33,69 +36,152 @@ export default function Chat() {
     scrollToBottom();
   }, [messages]);
 
-  const processarRespostaWebhook = (data: WebhookResponse): WebhookResponse => {
-    if (Array.isArray(data) && data[0]?.output) {
-      return { response: data[0].output };
-    }
-    
-    if (data.message && data.message.includes('Error')) {
-      return { error: 'Houve um erro no processamento da sua mensagem. Por favor, tente novamente.' };
+  // Função melhorada para processar a resposta do webhook
+  const processarRespostaWebhook = (data: any): WebhookResponse => {
+    console.log('Processando resposta do webhook:', JSON.stringify(data));
+
+    // Caso 1: Array de respostas (comum em algumas APIs)
+    if (Array.isArray(data)) {
+      console.log('Resposta é um array, tentando extrair conteúdo');
+      if (data.length > 0) {
+        const primeiroItem = data[0];
+        if (primeiroItem.output) return { response: primeiroItem.output };
+        if (primeiroItem.response) return { response: primeiroItem.response };
+        if (primeiroItem.message) return { response: primeiroItem.message };
+        if (typeof primeiroItem === 'string') return { response: primeiroItem };
+        console.log('Não conseguiu extrair resposta do array:', primeiroItem);
+      }
     }
 
-    if (data.response) {
-      return data;
+    // Caso 2: Detecção de erros
+    if (typeof data === 'object' && data !== null) {
+      if (data.error) return { error: data.error };
+      if (data.message && typeof data.message === 'string' && 
+          (data.message.includes('Error') || data.message.includes('erro'))) {
+        return { error: data.message };
+      }
     }
 
-    if (data.output) {
+    // Caso 3: Formato padrão
+    if (data && data.response) {
+      return { response: data.response };
+    }
+
+    // Caso 4: Formato alternativo
+    if (data && data.output) {
       return { response: data.output };
     }
 
-    return { error: 'Formato de resposta não reconhecido' };
+    // Caso 5: Objeto simples
+    if (data && typeof data === 'object' && Object.keys(data).length === 1) {
+      const valor = Object.values(data)[0];
+      if (typeof valor === 'string') {
+        return { response: valor };
+      }
+    }
+
+    // Caso 6: String direta
+    if (typeof data === 'string') {
+      return { response: data };
+    }
+
+    // Caso de fallback - retornar os dados brutos para debug
+    console.log('Formato de resposta não reconhecido, retornando dados brutos');
+    return { 
+      error: 'Formato de resposta não reconhecido',
+      data: data
+    };
   };
 
-  const enviarParaWebhook = async (mensagem: string): Promise<WebhookResponse> => {
-    try {
-      console.log('Enviando para webhook:', mensagem);
-      
-      const response = await fetch(WEBHOOK_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          message: mensagem,
-          timestamp: new Date().toISOString(),
-          source: 'dsm-app-chat'
-        }),
-      });
+  // Função para retentar requisições com um delay
+  const retryWithDelay = (fn: () => Promise<any>, retries: number): Promise<any> => {
+    return fn().catch(error => {
+      if (retries <= 0) {
+        throw error;
+      }
+      console.log(`Tentativa falhou, retentando em ${RETRY_DELAY}ms... Tentativas restantes: ${retries}`);
+      return new Promise(resolve => setTimeout(resolve, RETRY_DELAY))
+        .then(() => retryWithDelay(fn, retries - 1));
+    });
+  };
 
-      console.log('Resposta do webhook:', response.status);
+  // Função melhorada para enviar mensagens para o webhook
+  const enviarParaWebhook = async (mensagem: string): Promise<WebhookResponse> => {
+    console.log('Iniciando envio para webhook:', mensagem);
+    setWebhookError(null);
+
+    const executarFetch = () => fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        message: mensagem,
+        timestamp: new Date().toISOString(),
+        source: 'dsm-app-chat'
+      }),
+    });
+
+    try {
+      // Tenta com retentativas
+      const response = await retryWithDelay(() => executarFetch(), MAX_RETRIES);
+      console.log('Resposta do webhook obtida, status:', response.status);
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Erro do webhook:', errorText);
+        console.error('Erro do webhook (status não-ok):', errorText);
         
+        // Tenta analisar o erro como JSON
         try {
           const errorJson = JSON.parse(errorText);
+          console.log('Erro analisado como JSON:', errorJson);
+          
           if (errorJson.message) {
             throw new Error(errorJson.message);
           }
-        } catch {
-          // Se não conseguir parsear o JSON, usa o texto original
+        } catch (parseError) {
+          console.log('Erro ao analisar resposta de erro como JSON:', parseError);
+          // Usa o texto original se não conseguir analisar como JSON
         }
         
-        throw new Error(`Erro ${response.status}: ${errorText}`);
+        throw new Error(`Erro ${response.status}: ${errorText || 'Sem detalhes'}`);
       }
 
-      const data = await response.json();
-      console.log('Dados do webhook:', data);
+      // Converte a resposta em texto primeiro para debug
+      const responseText = await response.text();
+      console.log('Texto da resposta do webhook:', responseText);
+      
+      // Tenta parsear como JSON
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log('Resposta parseada com sucesso:', data);
+      } catch (parseError) {
+        console.error('Erro ao parsear resposta como JSON:', parseError);
+        
+        // Se o texto for uma string simples, retorna como resposta
+        if (responseText && typeof responseText === 'string' && responseText.trim()) {
+          return { response: responseText.trim() };
+        }
+        
+        throw new Error('Resposta do webhook não é um JSON válido');
+      }
       
       return processarRespostaWebhook(data);
     } catch (error) {
-      console.error('Erro detalhado ao enviar para webhook:', error);
-      setWebhookError(error instanceof Error ? error.message : 'Erro ao enviar mensagem');
-      return { error: 'Falha na comunicação com o assistente. Por favor, tente novamente.' };
+      console.error('Erro crítico ao comunicar com webhook:', error);
+      
+      const errorMessage = error instanceof Error 
+        ? `Erro: ${error.message}` 
+        : 'Erro desconhecido ao comunicar com o assistente';
+      
+      setWebhookError(errorMessage);
+      
+      return { 
+        error: 'Falha na comunicação com o assistente. Por favor, tente novamente.',
+        message: errorMessage
+      };
     }
   };
 
@@ -111,9 +197,20 @@ export default function Chat() {
 
     try {
       const webhookResponse = await enviarParaWebhook(userMessage.content);
+      console.log('Resposta final do webhook:', webhookResponse);
       
       if (webhookResponse.error) {
         setWebhookError(webhookResponse.error);
+        console.error('Erro reportado na resposta:', webhookResponse.error);
+        
+        // Se tiver algum conteúdo para mostrar mesmo com erro, mostra
+        if (webhookResponse.response) {
+          const assistantMessage = { 
+            role: 'assistant' as const, 
+            content: webhookResponse.response 
+          };
+          setMessages(prev => [...prev, assistantMessage]);
+        }
         return;
       }
 
@@ -123,9 +220,23 @@ export default function Chat() {
           content: webhookResponse.response 
         };
         setMessages(prev => [...prev, assistantMessage]);
+      } else if (webhookResponse.data) {
+        // Para debug - mostra os dados brutos se não conseguir extrair uma resposta
+        console.warn('Exibindo dados brutos devido a formato desconhecido');
+        const rawData = typeof webhookResponse.data === 'object' 
+          ? JSON.stringify(webhookResponse.data, null, 2)
+          : String(webhookResponse.data);
+          
+        const assistantMessage = { 
+          role: 'assistant' as const, 
+          content: `*Resposta em formato não processado:*\n\`\`\`json\n${rawData}\n\`\`\`` 
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+      } else {
+        throw new Error('Resposta vazia ou em formato desconhecido');
       }
     } catch (error) {
-      console.error('Erro ao processar mensagem:', error);
+      console.error('Erro grave ao processar mensagem:', error);
       setWebhookError('Ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.');
     } finally {
       setIsLoading(false);
