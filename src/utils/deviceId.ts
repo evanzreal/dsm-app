@@ -8,8 +8,7 @@ export function generateDeviceId(): string {
   const navigatorInfo = [
     navigator.userAgent,
     navigator.language,
-    navigator.hardwareConcurrency,
-    navigator.deviceMemory,
+    navigator.hardwareConcurrency || '',
     screen.colorDepth,
     screen.width,
     screen.height,
