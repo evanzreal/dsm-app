@@ -81,7 +81,7 @@ export default function Chat() {
           if (errorJson.message) {
             throw new Error(errorJson.message);
           }
-        } catch (_) {
+        } catch {
           // Se não conseguir parsear o JSON, usa o texto original
         }
         
