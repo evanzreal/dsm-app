@@ -6,4 +6,7 @@ export const VALID_ACCESS_CODES = [
 ];
 
 // Chave para armazenamento no localStorage
-export const AUTH_STORAGE_KEY = '@pluma-dsm:auth'; 
+export const AUTH_STORAGE_KEY = '@pluma-dsm:auth';
+
+// Chave para armazenamento dos códigos já utilizados
+export const USED_CODES_STORAGE_KEY = '@pluma-dsm:used-codes'; 
