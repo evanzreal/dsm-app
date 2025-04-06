@@ -114,7 +114,7 @@ export default function Chat() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'Accept': 'application/json, text/plain',
       },
       body: JSON.stringify({
         message: mensagem,
@@ -148,24 +148,35 @@ export default function Chat() {
         throw new Error(`Erro ${response.status}: ${errorText || 'Sem detalhes'}`);
       }
 
-      // Converte a resposta em texto primeiro para debug
+      // Verifica o tipo de conteúdo da resposta
+      const contentType = response.headers.get('content-type');
+      const isJson = contentType && contentType.includes('application/json');
+      
+      // Converte a resposta em texto primeiro
       const responseText = await response.text();
       console.log('Texto da resposta do webhook:', responseText);
+      
+      // Se a resposta não é JSON ou não parece JSON, retorna diretamente como texto
+      if (!isJson && !responseText.trim().startsWith('{') && !responseText.trim().startsWith('[')) {
+        console.log('Resposta detectada como texto puro, não JSON');
+        return { response: responseText.trim() };
+      }
       
       // Tenta parsear como JSON
       let data;
       try {
         data = JSON.parse(responseText);
-        console.log('Resposta parseada com sucesso:', data);
+        console.log('Resposta parseada com sucesso como JSON:', data);
       } catch (parseError) {
         console.error('Erro ao parsear resposta como JSON:', parseError);
         
-        // Se o texto for uma string simples, retorna como resposta
+        // Mesmo que tenha falhado o parse, retorna o texto como resposta se tiver conteúdo
         if (responseText && typeof responseText === 'string' && responseText.trim()) {
+          console.log('Retornando texto da resposta mesmo após falha no parse JSON');
           return { response: responseText.trim() };
         }
         
-        throw new Error('Resposta do webhook não é um JSON válido');
+        throw new Error('Resposta do webhook não é um JSON válido e não pode ser processada como texto');
       }
       
       return processarRespostaWebhook(data);
