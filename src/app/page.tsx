@@ -2,12 +2,11 @@ import Chat from '@/components/Chat';
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-4 bg-gray-50">
-      <div className="w-full max-w-4xl bg-white rounded-lg shadow-xl overflow-hidden">
-        <div className="bg-purple-600 p-4">
-          <h1 className="text-2xl font-bold text-white">DSM Assistant</h1>
-          <p className="text-purple-100">Seu assistente especializado em DSM</p>
-        </div>
+    <main className="min-h-screen w-full max-w-[430px] mx-auto bg-white relative">
+      <div className="fixed top-0 left-0 right-0 max-w-[430px] mx-auto bg-purple-600 text-white p-4 z-10">
+        <h1 className="text-lg font-medium">Seu assistente especializado em DSM</h1>
+      </div>
+      <div className="h-screen pt-16 pb-0">
         <Chat />
       </div>
     </main>
