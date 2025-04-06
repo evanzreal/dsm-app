@@ -12,8 +12,8 @@ interface Message {
 interface WebhookResponse {
   response?: string;
   error?: string;
-  message?: string; // Para mensagens de erro do n8n
-  output?: string;  // Para a resposta direta do n8n
+  message?: string;
+  output?: string;
 }
 
 const WEBHOOK_URL = 'https://primary-production-c25e.up.railway.app/webhook/cf944c6e-132b-4309-9646-967e221b6d82';
@@ -34,27 +34,22 @@ export default function Chat() {
   }, [messages]);
 
   const processarRespostaWebhook = (data: WebhookResponse): WebhookResponse => {
-    // Se a resposta vier no formato array com output
     if (Array.isArray(data) && data[0]?.output) {
       return { response: data[0].output };
     }
     
-    // Se vier uma mensagem de erro do n8n
     if (data.message && data.message.includes('Error')) {
       return { error: 'Houve um erro no processamento da sua mensagem. Por favor, tente novamente.' };
     }
 
-    // Se vier no formato response direto
     if (data.response) {
       return data;
     }
 
-    // Se vier no formato output direto
     if (data.output) {
       return { response: data.output };
     }
 
-    // Se não conseguir identificar o formato
     return { error: 'Formato de resposta não reconhecido' };
   };
 
@@ -86,7 +81,7 @@ export default function Chat() {
           if (errorJson.message) {
             throw new Error(errorJson.message);
           }
-        } catch (e) {
+        } catch (_) {
           // Se não conseguir parsear o JSON, usa o texto original
         }
         
