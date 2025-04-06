@@ -133,10 +133,10 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)]">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4" id="chat-messages">
+    <div className="flex flex-col h-[calc(100vh-3.5rem)] sm:h-[calc(100vh-6rem)] md:h-[calc(100vh-8rem)] max-w-7xl mx-auto w-full">
+      <div className="flex-1 overflow-y-auto px-2 py-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 md:space-y-6" id="chat-messages">
         {webhookError && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 sm:px-4 sm:py-3 rounded relative text-sm sm:text-base mb-4" role="alert">
             <strong className="font-bold">Erro: </strong>
             <span className="block sm:inline">{webhookError}</span>
           </div>
@@ -149,13 +149,13 @@ export default function Chat() {
             } animate-fade-in`}
           >
             <div
-              className={`max-w-[80%] rounded-lg p-3 ${
+              className={`max-w-[90%] sm:max-w-[85%] md:max-w-[75%] rounded-lg p-2.5 sm:p-3 md:p-4 ${
                 message.role === 'user'
                   ? 'bg-purple-600 text-white'
                   : 'bg-gray-100 text-gray-800'
               }`}
             >
-              <div className="prose prose-sm max-w-none">
+              <div className="prose prose-sm md:prose-base max-w-none text-sm sm:text-base md:text-lg">
                 <ReactMarkdown
                   components={{
                     p: ({children}) => <p className="m-0">{children}</p>
@@ -169,11 +169,11 @@ export default function Chat() {
         ))}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 rounded-lg p-3">
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            <div className="bg-gray-100 rounded-lg p-2 sm:p-3 md:p-4">
+              <div className="flex space-x-1.5 sm:space-x-2 md:space-x-3">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 md:w-2.5 md:h-2.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 md:w-2.5 md:h-2.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 md:w-2.5 md:h-2.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
               </div>
             </div>
           </div>
@@ -181,22 +181,22 @@ export default function Chat() {
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="p-4 border-t">
-        <div className="flex space-x-2">
+      <form onSubmit={handleSubmit} className="p-2 sm:p-3 md:p-4 border-t border-gray-200">
+        <div className="flex space-x-2 sm:space-x-3 md:space-x-4 max-w-4xl mx-auto">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Digite sua pergunta sobre o DSM..."
-            className="flex-1 rounded-lg border border-gray-300 p-2 focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-800 placeholder-gray-500"
+            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 sm:px-4 sm:py-2.5 md:px-5 md:py-3 text-sm sm:text-base md:text-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-800 placeholder-gray-500"
             disabled={isLoading}
           />
           <button
             type="submit"
             disabled={isLoading}
-            className="bg-purple-600 text-white rounded-lg px-4 py-2 hover:bg-purple-700 transition-colors disabled:bg-purple-400"
+            className="bg-purple-600 text-white rounded-lg px-3 sm:px-4 md:px-5 py-2 sm:py-2.5 md:py-3 hover:bg-purple-700 transition-colors disabled:bg-purple-400 flex items-center justify-center min-w-[2.5rem] sm:min-w-[3rem] md:min-w-[3.5rem]"
           >
-            <PaperAirplaneIcon className="h-5 w-5" />
+            <PaperAirplaneIcon className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6" />
           </button>
         </div>
       </form>
