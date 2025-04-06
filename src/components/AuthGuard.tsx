@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { FaSpinner } from 'react-icons/fa';
 
 export default function AuthGuard({
   children,
@@ -9,39 +10,31 @@ export default function AuthGuard({
   children: React.ReactNode;
 }) {
   const { isAuthenticated } = useAuth();
-  const [isChecking, setIsChecking] = useState(true);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      setIsChecking(true);
-      
-      setTimeout(() => {
-        if (!isAuthenticated) {
-          // Força o redirecionamento usando window.location
-          window.location.href = '/login';
-        } else {
-          setIsChecking(false);
-        }
-      }, 300); // Pequeno delay para garantir que o estado de autenticação esteja atualizado
-    };
-
-    checkAuth();
+    // Verificação de autenticação
+    if (!isAuthenticated) {
+      window.location.href = '/login';
+      return;
+    }
+    
+    // Se chegou aqui, está autenticado
+    setChecking(false);
   }, [isAuthenticated]);
 
-  if (isChecking) {
+  // Mostra tela de carregamento enquanto verifica autenticação
+  if (checking) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-purple-600 border-r-2 border-b-2 border-gray-200 mb-4"></div>
-          <p className="text-gray-700">Carregando...</p>
+          <FaSpinner className="animate-spin text-blue-600 h-8 w-8 mx-auto mb-4" />
+          <p className="text-gray-700">Verificando acesso...</p>
         </div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
+  // Renderiza o conteúdo protegido
   return <>{children}</>;
 } 
