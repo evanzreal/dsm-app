@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { AUTH_STORAGE_KEY, USED_CODES_STORAGE_KEY, VERIFIED_DEVICES_STORAGE_KEY } from '@/config/auth';
+import { DEVICE_ID_STORAGE_KEY } from '@/utils/deviceId';
 
 export default function LoginPage() {
   const [code, setCode] = useState('');
@@ -10,8 +12,20 @@ export default function LoginPage() {
   const [isVerifying, setIsVerifying] = useState(true);
   const { login, isAuthenticated } = useAuth();
 
+  // Função para limpar os dados de autenticação localmente
+  const clearAuthData = () => {
+    try {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      console.log('Dados de autenticação limpos.');
+    } catch (error) {
+      console.error('Erro ao limpar dados:', error);
+    }
+  };
+
   // Função para redirecionar para a página principal
   const redirectToHome = () => {
+    // Limpa qualquer erro antes de redirecionar
+    setError('');
     // Força o redirecionamento usando window.location em vez de router.push
     window.location.href = '/';
   };
@@ -21,24 +35,47 @@ export default function LoginPage() {
     const checkDevice = async () => {
       setIsVerifying(true);
       try {
+        // Primeiro, verifica se já está autenticado pelo estado do hook
+        if (isAuthenticated) {
+          redirectToHome();
+          return;
+        }
+
+        // Tenta fazer login sem código (verificação de dispositivo)
         const result = login('');
         if (result.success) {
           redirectToHome();
         }
+      } catch (error) {
+        console.error('Erro ao verificar dispositivo:', error);
+        // Em caso de erro, limpa os dados para evitar estados inconsistentes
+        clearAuthData();
       } finally {
         setIsVerifying(false);
       }
     };
 
     checkDevice();
-  }, [login]);
+  }, [login, isAuthenticated]);
 
-  // Redireciona se já estiver autenticado
-  useEffect(() => {
-    if (isAuthenticated) {
-      redirectToHome();
+  // Limpa os problemas de CORS e outros erros
+  const resetApplication = () => {
+    try {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      localStorage.removeItem(USED_CODES_STORAGE_KEY);
+      localStorage.removeItem(VERIFIED_DEVICES_STORAGE_KEY);
+      localStorage.removeItem(DEVICE_ID_STORAGE_KEY);
+      
+      setError('Dados resetados. Tente novamente com seu código.');
+      
+      // Recarrega a página após limpar os dados
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (error) {
+      console.error('Erro ao resetar aplicação:', error);
     }
-  }, [isAuthenticated]);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,16 +88,24 @@ export default function LoginPage() {
       return;
     }
 
-    const result = login(code);
-    setIsLoading(false);
-    
-    if (result.success) {
-      // Adiciona um pequeno delay antes do redirecionamento
-      setTimeout(() => {
-        redirectToHome();
-      }, 500);
-    } else {
-      setError(result.message);
+    try {
+      const result = login(code);
+      
+      if (result.success) {
+        // Adiciona um pequeno delay antes do redirecionamento
+        setTimeout(() => {
+          redirectToHome();
+        }, 500);
+      } else {
+        setError(result.message);
+      }
+    } catch (error) {
+      console.error('Erro ao fazer login:', error);
+      setError('Ocorreu um erro ao processar o login. Tente novamente.');
+      // Em caso de erro, limpa os dados para evitar estados inconsistentes
+      clearAuthData();
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -108,7 +153,7 @@ export default function LoginPage() {
             <div className="text-red-600 text-sm text-center">{error}</div>
           )}
 
-          <div>
+          <div className="flex flex-col space-y-3">
             <button
               type="submit"
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:bg-purple-400"
@@ -125,6 +170,14 @@ export default function LoginPage() {
               ) : (
                 'Entrar'
               )}
+            </button>
+            
+            <button
+              type="button"
+              onClick={resetApplication}
+              className="text-sm text-gray-500 hover:text-gray-700 focus:outline-none"
+            >
+              Problemas para acessar? Clique aqui para redefinir
             </button>
           </div>
         </form>
