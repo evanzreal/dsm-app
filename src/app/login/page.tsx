@@ -89,23 +89,24 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
-      <div className="w-full max-w-md bg-white rounded-lg shadow-md p-6">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">Acesso Restrito</h1>
-          <p className="text-gray-600 mt-2">Digite o código de acesso para continuar</p>
+      <div className="w-full max-w-lg bg-white rounded-lg shadow-xl p-8 md:p-10">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-800 mb-2">DSM Assistant</h1>
+          <h2 className="text-xl font-semibold text-gray-700">Acesso Restrito</h2>
+          <p className="text-gray-600 mt-2 text-lg">Digite o código de acesso para continuar</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6 max-w-md mx-auto">
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <FaLock className="text-gray-500" />
+            <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+              <FaLock className="text-gray-500 text-xl" />
             </div>
             <input
               type="text"
               id="code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              className="bg-gray-50 border border-gray-300 text-gray-900 rounded-lg block w-full pl-10 p-2.5 focus:ring-blue-500 focus:border-blue-500"
+              className="bg-gray-50 border border-gray-300 text-gray-900 text-lg rounded-lg block w-full pl-12 p-3 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Código de acesso"
               disabled={status === 'loading' || status === 'success'}
             />
@@ -114,41 +115,41 @@ export default function Login() {
           <button
             type="submit"
             disabled={status === 'loading' || status === 'success'}
-            className={`w-full flex justify-center items-center py-2.5 px-5 font-medium rounded-lg text-white ${
+            className={`w-full flex justify-center items-center py-3 px-5 text-lg font-medium rounded-lg text-white ${
               status === 'success' ? 'bg-green-600' :
               status === 'loading' ? 'bg-blue-500 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
-            {status === 'loading' && <FaSpinner className="animate-spin mr-2" />}
-            {status === 'success' && <FaCheckCircle className="mr-2" />}
+            {status === 'loading' && <FaSpinner className="animate-spin mr-2 text-xl" />}
+            {status === 'success' && <FaCheckCircle className="mr-2 text-xl" />}
             {status === 'loading' ? 'Verificando...' : 
              status === 'success' ? 'Acesso Concedido' : 'Entrar'}
           </button>
         </form>
 
         {status === 'error' && (
-          <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-lg flex items-center">
-            <MdError className="mr-2" />
-            <span>{errorMessage}</span>
+          <div className="mt-6 p-4 bg-red-100 text-red-700 rounded-lg flex items-center max-w-md mx-auto">
+            <MdError className="mr-2 text-xl" />
+            <span className="text-lg">{errorMessage}</span>
           </div>
         )}
 
         {status === 'success' && (
-          <div className="mt-4 p-3 bg-green-100 text-green-700 rounded-lg flex flex-col items-center">
+          <div className="mt-6 p-4 bg-green-100 text-green-700 rounded-lg flex flex-col items-center max-w-md mx-auto">
             <div className="flex items-center mb-2">
-              <FaCheckCircle className="mr-2" />
-              <span>Login realizado com sucesso!</span>
+              <FaCheckCircle className="mr-2 text-xl" />
+              <span className="text-lg">Login realizado com sucesso!</span>
             </div>
-            <p className="text-sm text-center">
+            <p className="text-md text-center">
               Redirecionando para a página principal...
             </p>
           </div>
         )}
 
-        <div className="mt-6 text-center">
+        <div className="mt-8 text-center">
           <button
             onClick={clearAllData}
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="text-md text-gray-500 hover:text-gray-700 hover:underline"
           >
             Limpar dados de acesso
           </button>

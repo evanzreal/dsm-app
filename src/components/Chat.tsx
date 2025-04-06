@@ -135,19 +135,43 @@ export default function Chat() {
   return (
     <div className="flex flex-col h-full">
       <div 
-        className="flex-1 overflow-y-auto px-4 py-3 space-y-4" 
+        className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4" 
         id="chat-messages"
         style={{ 
-          height: 'calc(100vh - 140px)',
+          height: 'calc(100% - 72px)',
           overscrollBehavior: 'contain'
         }}
       >
+        {messages.length === 0 && (
+          <div className="h-full flex flex-col items-center justify-center text-center px-4 md:px-8 text-gray-500">
+            <div className="max-w-md">
+              <h2 className="text-xl font-semibold mb-3 text-gray-700">Olá! Como posso ajudar?</h2>
+              <p className="mb-6">Faça perguntas sobre o Manual Diagnóstico e Estatístico de Transtornos Mentais (DSM).</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <button 
+                  onClick={() => setInput("Quais são os principais transtornos de ansiedade no DSM-5?")}
+                  className="bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg p-3 text-sm text-left transition-colors"
+                >
+                  Quais são os principais transtornos de ansiedade no DSM-5?
+                </button>
+                <button 
+                  onClick={() => setInput("Como diferenciar depressão de transtorno bipolar?")}
+                  className="bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg p-3 text-sm text-left transition-colors"
+                >
+                  Como diferenciar depressão de transtorno bipolar?
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
         {webhookError && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-3 py-2 rounded relative text-sm" role="alert">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative text-sm" role="alert">
             <strong className="font-bold">Erro: </strong>
             <span className="block sm:inline">{webhookError}</span>
           </div>
         )}
+        
         {messages.map((message, index) => (
           <div
             key={index}
@@ -156,13 +180,13 @@ export default function Chat() {
             } animate-fade-in`}
           >
             <div
-              className={`max-w-[85%] rounded-2xl px-4 py-2 ${
+              className={`rounded-lg md:rounded-xl px-4 py-3 ${
                 message.role === 'user'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-100 text-gray-800'
+                  ? 'bg-purple-600 text-white max-w-[80%] md:max-w-[65%]'
+                  : 'bg-gray-100 text-gray-800 max-w-[85%] md:max-w-[75%]'
               }`}
             >
-              <div className="prose prose-sm max-w-none text-[15px] leading-relaxed">
+              <div className="prose prose-sm md:prose-base max-w-none text-[15px] md:text-base leading-relaxed">
                 <ReactMarkdown
                   components={{
                     p: ({children}) => <p className="m-0">{children}</p>
@@ -174,43 +198,45 @@ export default function Chat() {
             </div>
           </div>
         ))}
+        
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 rounded-2xl px-4 py-2">
-              <div className="flex space-x-1.5">
-                <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            <div className="bg-gray-100 rounded-lg px-4 py-3">
+              <div className="flex space-x-2">
+                <div className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2.5 h-2.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
               </div>
             </div>
           </div>
         )}
+        
         <div ref={messagesEndRef} />
       </div>
 
       <form 
         onSubmit={handleSubmit} 
-        className="border-t bg-white p-4 sticky bottom-0 left-0 right-0"
+        className="border-t bg-white p-3 md:p-4 sticky bottom-0 left-0 right-0"
         style={{
-          boxShadow: '0 -4px 6px -1px rgba(0, 0, 0, 0.1)'
+          boxShadow: '0 -2px 10px -1px rgba(0, 0, 0, 0.1)'
         }}
       >
-        <div className="flex space-x-2">
+        <div className="flex space-x-2 md:space-x-3 max-w-4xl mx-auto">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Digite sua pergunta sobre o DSM..."
-            className="flex-1 rounded-full border border-gray-300 px-4 py-2.5 text-[15px] focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-800 placeholder-gray-500"
+            className="flex-1 rounded-full border border-gray-300 px-4 py-2.5 md:py-3 text-base focus:outline-none focus:ring-2 focus:ring-purple-500 text-gray-800 placeholder-gray-500"
             disabled={isLoading}
           />
           <button
             type="submit"
             disabled={isLoading}
-            className="bg-purple-600 text-white rounded-full p-2.5 hover:bg-purple-700 transition-colors disabled:bg-purple-400 flex items-center justify-center min-w-[40px]"
+            className="bg-purple-600 text-white rounded-full p-2.5 md:p-3 hover:bg-purple-700 transition-colors disabled:bg-purple-400 flex items-center justify-center min-w-[44px] md:min-w-[48px]"
             aria-label="Enviar mensagem"
           >
-            <PaperAirplaneIcon className="h-5 w-5" />
+            <PaperAirplaneIcon className="h-5 w-5 md:h-6 md:w-6" />
           </button>
         </div>
       </form>
