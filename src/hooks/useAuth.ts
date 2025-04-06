@@ -141,50 +141,68 @@ export function useAuth() {
   }, []);
 
   const login = (code: string) => {
-    const normalizedCode = code.trim().toUpperCase();
-    
-    // Se o código estiver vazio, apenas verifica se o dispositivo já está autorizado
-    if (!code.trim()) {
-      const deviceVerification = isDeviceVerified();
-      if (deviceVerification.verified && deviceVerification.accessCode) {
-        // Define o estado de autenticação com o código do dispositivo
-        const newAuthState = { isAuthenticated: true, accessCode: deviceVerification.accessCode };
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newAuthState));
-        setAuthState(newAuthState);
+    try {
+      const normalizedCode = code.trim().toUpperCase();
+      
+      // Se o código estiver vazio, apenas verifica se o dispositivo já está autorizado
+      if (!code.trim()) {
+        console.log('Login sem código: verificando dispositivo');
+        const deviceVerification = isDeviceVerified();
+        console.log('Verificação de dispositivo:', deviceVerification);
         
-        // Força atualização do estado com pequeno delay 
-        setTimeout(() => {
-          setAuthState({ ...newAuthState });
-        }, 100);
+        if (deviceVerification.verified && deviceVerification.accessCode) {
+          console.log('Dispositivo já verificado com código:', deviceVerification.accessCode);
+          // Define o estado de autenticação com o código do dispositivo
+          const newAuthState = { isAuthenticated: true, accessCode: deviceVerification.accessCode };
+          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newAuthState));
+          setAuthState(newAuthState);
+          
+          // Força atualização do estado com pequeno delay 
+          setTimeout(() => {
+            setAuthState({ ...newAuthState });
+          }, 100);
+          
+          return { success: true, message: 'Dispositivo já verificado. Login realizado com sucesso.' };
+        }
         
-        return { success: true, message: 'Dispositivo já verificado. Login realizado com sucesso.' };
+        console.log('Dispositivo não verificado ou sem código associado');
+        return { success: false, message: '' };
       }
       
-      return { success: false, message: '' };
+      // Verifica se o código é válido
+      console.log('Verificando se código é válido:', normalizedCode);
+      if (!VALID_ACCESS_CODES.includes(normalizedCode)) {
+        console.log('Código inválido');
+        return { success: false, message: 'Código de acesso inválido' };
+      }
+      
+      // Verifica se o código já foi usado
+      console.log('Verificando se código já foi usado');
+      if (isCodeAlreadyUsed(normalizedCode)) {
+        console.log('Código já foi usado anteriormente');
+        return { success: false, message: 'Este código já foi utilizado' };
+      }
+      
+      // Marca o código como usado
+      console.log('Marcando código como usado');
+      markCodeAsUsed(normalizedCode);
+      
+      // Registra o dispositivo como verificado
+      console.log('Registrando dispositivo como verificado');
+      registerVerifiedDevice(normalizedCode);
+      
+      // Define o estado de autenticação
+      console.log('Definindo estado de autenticação');
+      const newAuthState = { isAuthenticated: true, accessCode: normalizedCode };
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newAuthState));
+      setAuthState(newAuthState);
+      
+      console.log('Login completo com sucesso');
+      return { success: true, message: 'Login realizado com sucesso' };
+    } catch (error) {
+      console.error('Erro crítico no processo de login:', error);
+      return { success: false, message: 'Ocorreu um erro ao processar o login. Tente novamente.' };
     }
-    
-    // Verifica se o código é válido
-    if (!VALID_ACCESS_CODES.includes(normalizedCode)) {
-      return { success: false, message: 'Código de acesso inválido' };
-    }
-    
-    // Verifica se o código já foi usado
-    if (isCodeAlreadyUsed(normalizedCode)) {
-      return { success: false, message: 'Este código já foi utilizado' };
-    }
-    
-    // Marca o código como usado
-    markCodeAsUsed(normalizedCode);
-    
-    // Registra o dispositivo como verificado
-    registerVerifiedDevice(normalizedCode);
-    
-    // Define o estado de autenticação
-    const newAuthState = { isAuthenticated: true, accessCode: normalizedCode };
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newAuthState));
-    setAuthState(newAuthState);
-    
-    return { success: true, message: 'Login realizado com sucesso' };
   };
 
   const logout = () => {

@@ -10,6 +10,8 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isVerifying, setIsVerifying] = useState(true);
+  const [loginSuccess, setLoginSuccess] = useState(false);
+  const [countdown, setCountdown] = useState(3);
   const { login, isAuthenticated } = useAuth();
 
   // Função para limpar os dados de autenticação localmente
@@ -22,12 +24,23 @@ export default function LoginPage() {
     }
   };
 
-  // Função para redirecionar para a página principal
+  // Função para redirecionar para a página principal com um método mais forçado
   const redirectToHome = () => {
-    // Limpa qualquer erro antes de redirecionar
-    setError('');
-    // Força o redirecionamento usando window.location em vez de router.push
-    window.location.href = '/';
+    console.log('Tentativa de redirecionamento para a página principal');
+    
+    // Método 1: window.location.href (mais confiável para redirecionamento completo)
+    try {
+      window.location.href = '/';
+    } catch (error) {
+      console.error('Erro ao redirecionar (método 1):', error);
+      
+      // Se o método 1 falhar, tentamos o método 2 como backup
+      try {
+        window.location.replace('/');
+      } catch (backupError) {
+        console.error('Erro ao redirecionar (método 2):', backupError);
+      }
+    }
   };
 
   useEffect(() => {
@@ -37,14 +50,21 @@ export default function LoginPage() {
       try {
         // Primeiro, verifica se já está autenticado pelo estado do hook
         if (isAuthenticated) {
+          console.log('Usuário já autenticado pelo estado do hook');
           redirectToHome();
           return;
         }
 
         // Tenta fazer login sem código (verificação de dispositivo)
+        console.log('Tentando verificar dispositivo...');
         const result = login('');
+        console.log('Resultado da verificação de dispositivo:', result);
+        
         if (result.success) {
+          console.log('Dispositivo verificado com sucesso');
           redirectToHome();
+        } else {
+          console.log('Dispositivo não verificado');
         }
       } catch (error) {
         console.error('Erro ao verificar dispositivo:', error);
@@ -57,6 +77,19 @@ export default function LoginPage() {
 
     checkDevice();
   }, [login, isAuthenticated]);
+
+  // Efeito para o contador regressivo após login bem-sucedido
+  useEffect(() => {
+    if (loginSuccess && countdown > 0) {
+      const timer = setTimeout(() => {
+        setCountdown(countdown - 1);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    } else if (loginSuccess && countdown === 0) {
+      redirectToHome();
+    }
+  }, [loginSuccess, countdown]);
 
   // Limpa os problemas de CORS e outros erros
   const resetApplication = () => {
@@ -89,13 +122,13 @@ export default function LoginPage() {
     }
 
     try {
+      console.log('Tentando login com código:', code.trim());
       const result = login(code);
+      console.log('Resultado do login:', result);
       
       if (result.success) {
-        // Adiciona um pequeno delay antes do redirecionamento
-        setTimeout(() => {
-          redirectToHome();
-        }, 500);
+        console.log('Login bem-sucedido, preparando redirecionamento');
+        setLoginSuccess(true);
       } else {
         setError(result.message);
       }
@@ -115,6 +148,28 @@ export default function LoginPage() {
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-purple-600 border-r-2 border-b-2 border-gray-200 mb-4"></div>
           <p className="text-gray-700">Verificando dispositivo...</p>
+        </div>
+      </main>
+    );
+  }
+  
+  if (loginSuccess) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="text-center">
+          <div className="inline-block animate-pulse rounded-full h-16 w-16 bg-green-500 text-white flex items-center justify-center mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="h-8 w-8">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-medium text-gray-900 mb-2">Login realizado com sucesso!</h2>
+          <p className="text-gray-600 mb-4">Redirecionando em {countdown} segundos...</p>
+          <button 
+            onClick={redirectToHome}
+            className="text-sm text-purple-600 hover:text-purple-800 font-medium focus:outline-none"
+          >
+            Clique aqui se não for redirecionado automaticamente
+          </button>
         </div>
       </main>
     );
