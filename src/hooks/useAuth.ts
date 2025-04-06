@@ -1,5 +1,12 @@
 import { useState, useEffect } from 'react';
-import { VALID_ACCESS_CODES, AUTH_STORAGE_KEY, USED_CODES_STORAGE_KEY } from '@/config/auth';
+import { 
+  VALID_ACCESS_CODES, 
+  AUTH_STORAGE_KEY, 
+  USED_CODES_STORAGE_KEY,
+  VERIFIED_DEVICES_STORAGE_KEY,
+  VerifiedDevice
+} from '@/config/auth';
+import { getDeviceId } from '@/utils/deviceId';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -11,6 +18,64 @@ export function useAuth() {
     isAuthenticated: false,
     accessCode: null
   });
+
+  // Função para verificar se um dispositivo já está verificado
+  const isDeviceVerified = (): { verified: boolean; accessCode?: string } => {
+    try {
+      const deviceId = getDeviceId();
+      const verifiedDevices = localStorage.getItem(VERIFIED_DEVICES_STORAGE_KEY);
+      
+      if (verifiedDevices) {
+        const devices = JSON.parse(verifiedDevices) as VerifiedDevice[];
+        const currentDevice = devices.find(device => device.deviceId === deviceId);
+        
+        if (currentDevice) {
+          return { verified: true, accessCode: currentDevice.accessCode };
+        }
+      }
+      
+      return { verified: false };
+    } catch (error) {
+      console.error('Erro ao verificar dispositivo:', error);
+      return { verified: false };
+    }
+  };
+
+  // Função para registrar um dispositivo como verificado
+  const registerVerifiedDevice = (accessCode: string): void => {
+    try {
+      const deviceId = getDeviceId();
+      const verifiedDevices = localStorage.getItem(VERIFIED_DEVICES_STORAGE_KEY);
+      let devices: VerifiedDevice[] = [];
+      
+      if (verifiedDevices) {
+        devices = JSON.parse(verifiedDevices) as VerifiedDevice[];
+      }
+      
+      // Verifica se este dispositivo já está registrado
+      const existingDevice = devices.findIndex(device => device.deviceId === deviceId);
+      
+      if (existingDevice !== -1) {
+        // Atualiza o dispositivo existente
+        devices[existingDevice] = {
+          deviceId,
+          accessCode,
+          verifiedAt: Date.now()
+        };
+      } else {
+        // Adiciona um novo dispositivo
+        devices.push({
+          deviceId,
+          accessCode,
+          verifiedAt: Date.now()
+        });
+      }
+      
+      localStorage.setItem(VERIFIED_DEVICES_STORAGE_KEY, JSON.stringify(devices));
+    } catch (error) {
+      console.error('Erro ao registrar dispositivo:', error);
+    }
+  };
 
   // Função para verificar se um código já foi usado
   const isCodeAlreadyUsed = (code: string): boolean => {
@@ -47,13 +112,26 @@ export function useAuth() {
   };
 
   useEffect(() => {
-    // Verifica se existe um código salvo no localStorage
+    // Primeiro, verifica se o dispositivo já está verificado
+    const deviceVerification = isDeviceVerified();
+    
+    if (deviceVerification.verified && deviceVerification.accessCode) {
+      setAuthState({
+        isAuthenticated: true,
+        accessCode: deviceVerification.accessCode
+      });
+      return;
+    }
+    
+    // Se o dispositivo não estiver verificado, verifica se existe um código salvo no localStorage
     const savedAuth = localStorage.getItem(AUTH_STORAGE_KEY);
     if (savedAuth) {
       try {
         const { accessCode } = JSON.parse(savedAuth);
         if (VALID_ACCESS_CODES.includes(accessCode)) {
           setAuthState({ isAuthenticated: true, accessCode });
+          // Registra o dispositivo como verificado
+          registerVerifiedDevice(accessCode);
         }
       } catch (error) {
         console.error('Erro ao carregar estado de autenticação:', error);
@@ -64,6 +142,16 @@ export function useAuth() {
 
   const login = (code: string) => {
     const normalizedCode = code.trim().toUpperCase();
+    
+    // Primeiro verifica se o dispositivo já está verificado
+    const deviceVerification = isDeviceVerified();
+    if (deviceVerification.verified) {
+      // Define o estado de autenticação com o código do dispositivo
+      const newAuthState = { isAuthenticated: true, accessCode: deviceVerification.accessCode };
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newAuthState));
+      setAuthState(newAuthState);
+      return { success: true, message: 'Dispositivo já verificado. Login realizado com sucesso.' };
+    }
     
     // Verifica se o código é válido
     if (!VALID_ACCESS_CODES.includes(normalizedCode)) {
@@ -77,6 +165,9 @@ export function useAuth() {
     
     // Marca o código como usado
     markCodeAsUsed(normalizedCode);
+    
+    // Registra o dispositivo como verificado
+    registerVerifiedDevice(normalizedCode);
     
     // Define o estado de autenticação
     const newAuthState = { isAuthenticated: true, accessCode: normalizedCode };

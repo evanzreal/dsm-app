@@ -47,4 +47,14 @@ export const VALID_ACCESS_CODES = [
 export const AUTH_STORAGE_KEY = '@pluma-dsm:auth';
 
 // Chave para armazenamento dos códigos já utilizados
-export const USED_CODES_STORAGE_KEY = '@pluma-dsm:used-codes'; 
+export const USED_CODES_STORAGE_KEY = '@pluma-dsm:used-codes';
+
+// Chave para armazenamento do mapeamento de dispositivos verificados
+export const VERIFIED_DEVICES_STORAGE_KEY = '@pluma-dsm:verified-devices';
+
+// Interface para os dados de um dispositivo verificado
+export interface VerifiedDevice {
+  deviceId: string;
+  accessCode: string;
+  verifiedAt: number; // timestamp
+} 
