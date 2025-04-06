@@ -17,10 +17,29 @@ export default function Login() {
     localStorage.removeItem('usedCodes');
     localStorage.removeItem('verifiedDevices');
     localStorage.removeItem('deviceId');
+    sessionStorage.removeItem('redirect_prevention');
+    sessionStorage.removeItem('force_login_form');
+    
+    // Recarrega a página para iniciar com estado limpo
+    window.location.href = '/login';
   };
 
   // Efeito para verificar autenticação e redirecionar
   useEffect(() => {
+    // Verifica se há parâmetro de reset na URL ou flag de forçar formulário
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasReset = urlParams.get('reset') === 'true';
+    const forceLoginForm = sessionStorage.getItem('force_login_form') === 'true';
+    
+    // Se tiver flag de reset ou force_login_form, não tentamos login automático
+    if (hasReset || forceLoginForm) {
+      // Limpa a flag se existir
+      if (forceLoginForm) {
+        sessionStorage.removeItem('force_login_form');
+      }
+      return;
+    }
+    
     // Se já estiver autenticado, redireciona para a página principal
     if (isAuthenticated) {
       setTimeout(() => {

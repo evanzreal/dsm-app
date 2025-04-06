@@ -11,12 +11,14 @@ import { getDeviceId } from '@/utils/deviceId';
 interface AuthState {
   isAuthenticated: boolean;
   accessCode: string | null;
+  isValidating: boolean;
 }
 
 export function useAuth() {
   const [authState, setAuthState] = useState<AuthState>({
     isAuthenticated: false,
-    accessCode: null
+    accessCode: null,
+    isValidating: true // Inicialmente, estamos validando
   });
 
   // Função para verificar se um dispositivo já está verificado
@@ -113,14 +115,32 @@ export function useAuth() {
 
   // Efeito de inicialização para carregar o estado de autenticação
   useEffect(() => {
+    // Verifica se há parâmetro de reset ou flag de forçar formulário
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasReset = urlParams.get('reset') === 'true';
+    const forceLoginForm = sessionStorage.getItem('force_login_form') === 'true';
+    
+    if (hasReset || forceLoginForm) {
+      setAuthState({
+        isAuthenticated: false,
+        accessCode: null,
+        isValidating: false
+      });
+      return;
+    }
+    
     // Tentativa 1: Verificar dispositivo
     const deviceVerification = isDeviceVerified();
     if (deviceVerification.verified && deviceVerification.accessCode) {
-      setAuthState({
-        isAuthenticated: true,
-        accessCode: deviceVerification.accessCode
-      });
-      return;
+      // Verifica se o código ainda é válido
+      if (VALID_ACCESS_CODES.includes(deviceVerification.accessCode)) {
+        setAuthState({
+          isAuthenticated: true,
+          accessCode: deviceVerification.accessCode,
+          isValidating: false
+        });
+        return;
+      }
     }
     
     // Tentativa 2: Verificar localStorage
@@ -129,13 +149,30 @@ export function useAuth() {
       if (savedAuth) {
         const { accessCode } = JSON.parse(savedAuth);
         if (VALID_ACCESS_CODES.includes(accessCode)) {
-          setAuthState({ isAuthenticated: true, accessCode });
+          setAuthState({ 
+            isAuthenticated: true, 
+            accessCode,
+            isValidating: false 
+          });
           registerVerifiedDevice(accessCode);
+          return;
         }
       }
+      
+      // Se chegou aqui, não está autenticado
+      setAuthState({
+        isAuthenticated: false,
+        accessCode: null,
+        isValidating: false
+      });
     } catch (error) {
       console.error('Erro ao carregar autenticação:', error);
       localStorage.removeItem(AUTH_STORAGE_KEY);
+      setAuthState({
+        isAuthenticated: false,
+        accessCode: null,
+        isValidating: false
+      });
     }
   }, []);
 
@@ -144,20 +181,27 @@ export function useAuth() {
     if (!code.trim()) {
       const deviceVerification = isDeviceVerified();
       if (deviceVerification.verified && deviceVerification.accessCode) {
-        // Atualiza o estado de autenticação
-        const newAuthState = { 
-          isAuthenticated: true, 
-          accessCode: deviceVerification.accessCode 
-        };
-        
-        // Salva no localStorage e atualiza o estado
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newAuthState));
-        setAuthState(newAuthState);
-        
-        return { 
-          success: true, 
-          message: 'Dispositivo verificado' 
-        };
+        // Verifica se o código ainda é válido
+        if (VALID_ACCESS_CODES.includes(deviceVerification.accessCode)) {
+          // Atualiza o estado de autenticação
+          const newAuthState = { 
+            isAuthenticated: true, 
+            accessCode: deviceVerification.accessCode,
+            isValidating: false
+          };
+          
+          // Salva no localStorage e atualiza o estado
+          localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+            isAuthenticated: true,
+            accessCode: deviceVerification.accessCode
+          }));
+          setAuthState(newAuthState);
+          
+          return { 
+            success: true, 
+            message: 'Dispositivo verificado' 
+          };
+        }
       }
       return { success: false, message: '' };
     }
@@ -182,8 +226,15 @@ export function useAuth() {
     registerVerifiedDevice(normalizedCode);
     
     // Atualiza o estado de autenticação
-    const newAuthState = { isAuthenticated: true, accessCode: normalizedCode };
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newAuthState));
+    const newAuthState = { 
+      isAuthenticated: true, 
+      accessCode: normalizedCode,
+      isValidating: false
+    };
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+      isAuthenticated: true,
+      accessCode: normalizedCode
+    }));
     setAuthState(newAuthState);
     
     return { success: true, message: 'Login realizado com sucesso' };
@@ -191,12 +242,17 @@ export function useAuth() {
 
   const logout = () => {
     localStorage.removeItem(AUTH_STORAGE_KEY);
-    setAuthState({ isAuthenticated: false, accessCode: null });
+    setAuthState({ 
+      isAuthenticated: false, 
+      accessCode: null,
+      isValidating: false
+    });
   };
 
   return {
     isAuthenticated: authState.isAuthenticated,
     accessCode: authState.accessCode,
+    isValidating: authState.isValidating,
     login,
     logout
   };
