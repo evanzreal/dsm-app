@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function AuthGuard({
@@ -10,7 +9,6 @@ export default function AuthGuard({
   children: React.ReactNode;
 }) {
   const { isAuthenticated } = useAuth();
-  const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
