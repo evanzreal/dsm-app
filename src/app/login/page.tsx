@@ -12,6 +12,12 @@ export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated } = useAuth();
 
+  // Função para redirecionar para a página principal
+  const redirectToHome = () => {
+    // Força o redirecionamento usando window.location em vez de router.push
+    window.location.href = '/';
+  };
+
   useEffect(() => {
     // Verifica automaticamente se o dispositivo já está verificado
     const checkDevice = async () => {
@@ -19,7 +25,7 @@ export default function LoginPage() {
       try {
         const result = login('');
         if (result.success) {
-          router.push('/');
+          redirectToHome();
         }
       } finally {
         setIsVerifying(false);
@@ -27,14 +33,14 @@ export default function LoginPage() {
     };
 
     checkDevice();
-  }, [login, router]);
+  }, [login]);
 
   // Redireciona se já estiver autenticado
   useEffect(() => {
     if (isAuthenticated) {
-      router.push('/');
+      redirectToHome();
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +57,10 @@ export default function LoginPage() {
     setIsLoading(false);
     
     if (result.success) {
-      router.push('/');
+      // Adiciona um pequeno delay antes do redirecionamento
+      setTimeout(() => {
+        redirectToHome();
+      }, 500);
     } else {
       setError(result.message);
     }
@@ -92,6 +101,7 @@ export default function LoginPage() {
                 className="appearance-none rounded-lg relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-purple-500 focus:border-purple-500 focus:z-10 sm:text-sm"
                 placeholder="Digite seu código de acesso"
                 disabled={isLoading}
+                autoComplete="off"
               />
             </div>
           </div>

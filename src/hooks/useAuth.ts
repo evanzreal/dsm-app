@@ -143,14 +143,24 @@ export function useAuth() {
   const login = (code: string) => {
     const normalizedCode = code.trim().toUpperCase();
     
-    // Primeiro verifica se o dispositivo já está verificado
-    const deviceVerification = isDeviceVerified();
-    if (deviceVerification.verified) {
-      // Define o estado de autenticação com o código do dispositivo
-      const newAuthState = { isAuthenticated: true, accessCode: deviceVerification.accessCode };
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newAuthState));
-      setAuthState(newAuthState);
-      return { success: true, message: 'Dispositivo já verificado. Login realizado com sucesso.' };
+    // Se o código estiver vazio, apenas verifica se o dispositivo já está autorizado
+    if (!code.trim()) {
+      const deviceVerification = isDeviceVerified();
+      if (deviceVerification.verified && deviceVerification.accessCode) {
+        // Define o estado de autenticação com o código do dispositivo
+        const newAuthState = { isAuthenticated: true, accessCode: deviceVerification.accessCode };
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(newAuthState));
+        setAuthState(newAuthState);
+        
+        // Força atualização do estado com pequeno delay 
+        setTimeout(() => {
+          setAuthState({ ...newAuthState });
+        }, 100);
+        
+        return { success: true, message: 'Dispositivo já verificado. Login realizado com sucesso.' };
+      }
+      
+      return { success: false, message: '' };
     }
     
     // Verifica se o código é válido
