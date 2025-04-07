@@ -10,19 +10,18 @@ interface Message {
 }
 
 interface WebhookResponse {
-  response?: string;
+  success: boolean;
+  message: string;
   error?: string;
-  message?: string;
-  output?: string;
-  data?: unknown;
 }
 
 // Tipo para representar uma resposta do webhook, que pode ser de vários formatos
-type WebhookData = 
-  | string 
-  | Record<string, unknown>
-  | Array<Record<string, unknown> | string>
-  | { output?: string; response?: string; message?: string; error?: string; };
+interface WebhookData {
+  response?: string;
+  output?: string;
+  message?: string;
+  error?: string;
+}
 
 const WEBHOOK_URL = 'https://primary-production-c25e.up.railway.app/webhook/cf944c6e-132b-4309-9646-967e221b6d82';
 const MAX_RETRIES = 2;
@@ -45,80 +44,71 @@ export default function Chat() {
 
   // Função melhorada para processar a resposta do webhook
   const processarRespostaWebhook = (data: WebhookData): WebhookResponse => {
-    console.log('Processando resposta do webhook:', JSON.stringify(data));
-
-    // Caso 1: Array de respostas (comum em algumas APIs)
-    if (Array.isArray(data)) {
-      console.log('Resposta é um array, tentando extrair conteúdo');
-      if (data.length > 0) {
-        const primeiroItem = data[0];
-        if (typeof primeiroItem === 'object' && primeiroItem !== null) {
-          if ('output' in primeiroItem && typeof primeiroItem.output === 'string') 
-            return { response: primeiroItem.output };
-          if ('response' in primeiroItem && typeof primeiroItem.response === 'string') 
-            return { response: primeiroItem.response };
-          if ('message' in primeiroItem && typeof primeiroItem.message === 'string') 
-            return { response: primeiroItem.message };
-        }
-        if (typeof primeiroItem === 'string') return { response: primeiroItem };
-        console.log('Não conseguiu extrair resposta do array:', primeiroItem);
-      }
+    console.log('Processando resposta do webhook:', data);
+    
+    // Verifica se há erro na resposta
+    if (data.error) {
+      console.error('Erro na resposta do webhook:', data.error);
+      return {
+        success: false,
+        message: data.error
+      };
     }
 
-    // Caso 2: Detecção de erros
-    if (typeof data === 'object' && data !== null) {
-      if ('error' in data && typeof data.error === 'string') 
-        return { error: data.error };
+    // Verifica se há mensagem de erro
+    if (data.message && typeof data.message === 'string' && data.message.toLowerCase().includes('erro')) {
+      console.error('Mensagem de erro encontrada:', data.message);
+      return {
+        success: false,
+        message: data.message
+      };
+    }
+
+    // Verifica se há response ou output
+    const resposta = data.response || data.output;
+    if (!resposta) {
+      console.error('Resposta vazia do webhook');
+      return {
+        success: false,
+        message: 'Resposta vazia do assistente'
+      };
+    }
+
+    // Processa a resposta mantendo a formatação
+    try {
+      const respostaProcessada = resposta
+        .replace(/\\n/g, '\n')  // Converte \n em quebras de linha reais
+        .replace(/\\"/g, '"')   // Remove escape de aspas
+        .replace(/^"|"$/g, ''); // Remove aspas do início e fim
+
+      console.log('Resposta processada:', respostaProcessada);
       
-      if ('message' in data && typeof data.message === 'string' && 
-          (data.message.includes('Error') || data.message.includes('erro'))) {
-        return { error: data.message };
-      }
+      return {
+        success: true,
+        message: respostaProcessada
+      };
+    } catch (error) {
+      console.error('Erro ao processar resposta:', error);
+      return {
+        success: false,
+        message: 'Erro ao processar resposta do assistente'
+      };
     }
-
-    // Caso 3: Formato padrão
-    if (typeof data === 'object' && data !== null && 'response' in data && 
-        typeof data.response === 'string') {
-      return { response: data.response };
-    }
-
-    // Caso 4: Formato alternativo
-    if (typeof data === 'object' && data !== null && 'output' in data && 
-        typeof data.output === 'string') {
-      return { response: data.output };
-    }
-
-    // Caso 5: Objeto simples
-    if (typeof data === 'object' && data !== null && Object.keys(data).length === 1) {
-      const valor = Object.values(data)[0];
-      if (typeof valor === 'string') {
-        return { response: valor };
-      }
-    }
-
-    // Caso 6: String direta
-    if (typeof data === 'string') {
-      return { response: data };
-    }
-
-    // Caso de fallback - retornar os dados brutos para debug
-    console.log('Formato de resposta não reconhecido, retornando dados brutos');
-    return { 
-      error: 'Formato de resposta não reconhecido',
-      data: data
-    };
   };
 
   // Função para retentar requisições com um delay
-  const retryWithDelay = <T,>(fn: () => Promise<T>, retries: number): Promise<T> => {
-    return fn().catch(error => {
-      if (retries <= 0) {
-        throw error;
-      }
-      console.log(`Tentativa falhou, retentando em ${RETRY_DELAY}ms... Tentativas restantes: ${retries}`);
-      return new Promise<void>(resolve => setTimeout(resolve, RETRY_DELAY))
-        .then(() => retryWithDelay(fn, retries - 1));
-    });
+  const retryWithDelay = async <T,>(
+    fn: () => Promise<T>,
+    retries: number = MAX_RETRIES,
+    delay: number = RETRY_DELAY
+  ): Promise<T> => {
+    try {
+      return await fn();
+    } catch (error) {
+      if (retries === 0) throw error;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return retryWithDelay(fn, retries - 1, delay);
+    }
   };
 
   // Função melhorada para enviar mensagens para o webhook
