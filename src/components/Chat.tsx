@@ -85,7 +85,7 @@ export default function Chat() {
           if (jsonData.response) {
             respostaProcessada = jsonData.response;
           }
-        } catch (_) {
+        } catch {
           console.log('Não foi possível parsear a resposta como JSON, usando texto original');
         }
       }
