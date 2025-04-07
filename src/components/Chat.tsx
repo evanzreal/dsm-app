@@ -50,7 +50,7 @@ type WebhookData =
   | Array<Record<string, unknown> | string>
   | { output?: string; response?: string | RespostaEstruturada; message?: string; error?: string; };
 
-const WEBHOOK_URL = 'https://primary-production-c25e.up.railway.app/webhook-test/cf944c6e-132b-4309-9646-967e221b6d82';
+const WEBHOOK_URL = 'https://primary-production-c25e.up.railway.app/webhook/cf944c6e-132b-4309-9646-967e221b6d82';
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 1000; // 1 segundo
 
