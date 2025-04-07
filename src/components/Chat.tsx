@@ -76,8 +76,22 @@ export default function Chat() {
 
     // Processa a resposta mantendo a formatação
     try {
-      // Remove aspas extras e caracteres de escape
-      const respostaProcessada = resposta
+      let respostaProcessada = resposta;
+
+      // Se a resposta parece ser um JSON string, tenta parseá-la
+      if (typeof resposta === 'string' && resposta.trim().startsWith('{') && resposta.trim().endsWith('}')) {
+        try {
+          const jsonData = JSON.parse(resposta);
+          if (jsonData.response) {
+            respostaProcessada = jsonData.response;
+          }
+        } catch (e) {
+          console.log('Não foi possível parsear a resposta como JSON, usando texto original');
+        }
+      }
+
+      // Remove caracteres de escape e formatação
+      respostaProcessada = respostaProcessada
         .replace(/\\n/g, '\n')  // Converte \n em quebras de linha reais
         .replace(/\\"/g, '"')   // Remove escape de aspas
         .replace(/^"|"$/g, ''); // Remove aspas do início e fim
