@@ -165,7 +165,10 @@ export default function Chat() {
       // Se a resposta não é JSON ou não parece JSON, retorna diretamente como texto
       if (!isJson && !responseText.trim().startsWith('{') && !responseText.trim().startsWith('[')) {
         console.log('Resposta detectada como texto puro, não JSON');
-        return { response: responseText.trim() };
+        return { 
+          success: true,
+          message: responseText.trim() 
+        };
       }
       
       // Tenta parsear como JSON
@@ -179,7 +182,10 @@ export default function Chat() {
         // Mesmo que tenha falhado o parse, retorna o texto como resposta se tiver conteúdo
         if (responseText && typeof responseText === 'string' && responseText.trim()) {
           console.log('Retornando texto da resposta mesmo após falha no parse JSON');
-          return { response: responseText.trim() };
+          return { 
+            success: true,
+            message: responseText.trim() 
+          };
         }
         
         throw new Error('Resposta do webhook não é um JSON válido e não pode ser processada como texto');
@@ -196,8 +202,9 @@ export default function Chat() {
       setWebhookError(errorMessage);
       
       return { 
-        error: 'Falha na comunicação com o assistente. Por favor, tente novamente.',
-        message: errorMessage
+        success: false,
+        message: errorMessage,
+        error: 'Falha na comunicação com o assistente. Por favor, tente novamente.'
       };
     }
   };
@@ -216,42 +223,17 @@ export default function Chat() {
       const webhookResponse = await enviarParaWebhook(userMessage.content);
       console.log('Resposta final do webhook:', webhookResponse);
       
-      if (webhookResponse.error) {
-        setWebhookError(webhookResponse.error);
-        console.error('Erro reportado na resposta:', webhookResponse.error);
-        
-        // Se tiver algum conteúdo para mostrar mesmo com erro, mostra
-        if (webhookResponse.response) {
-          const assistantMessage = { 
-            role: 'assistant' as const, 
-            content: webhookResponse.response 
-          };
-          setMessages(prev => [...prev, assistantMessage]);
-        }
+      if (!webhookResponse.success) {
+        setWebhookError(webhookResponse.error || webhookResponse.message);
+        console.error('Erro reportado na resposta:', webhookResponse.error || webhookResponse.message);
         return;
       }
 
-      if (webhookResponse.response) {
-        const assistantMessage = { 
-          role: 'assistant' as const, 
-          content: webhookResponse.response 
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-      } else if (webhookResponse.data) {
-        // Para debug - mostra os dados brutos se não conseguir extrair uma resposta
-        console.warn('Exibindo dados brutos devido a formato desconhecido');
-        const rawData = typeof webhookResponse.data === 'object' 
-          ? JSON.stringify(webhookResponse.data, null, 2)
-          : String(webhookResponse.data);
-          
-        const assistantMessage = { 
-          role: 'assistant' as const, 
-          content: `*Resposta em formato não processado:*\n\`\`\`json\n${rawData}\n\`\`\`` 
-        };
-        setMessages(prev => [...prev, assistantMessage]);
-      } else {
-        throw new Error('Resposta vazia ou em formato desconhecido');
-      }
+      const assistantMessage = { 
+        role: 'assistant' as const, 
+        content: webhookResponse.message 
+      };
+      setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Erro grave ao processar mensagem:', error);
       setWebhookError('Ocorreu um erro ao processar sua mensagem. Por favor, tente novamente.');
