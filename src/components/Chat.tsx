@@ -9,34 +9,8 @@ interface Message {
   content: string;
 }
 
-// Interfaces para representar a estrutura exata da resposta do webhook
-interface AvaliacaoItem {
-  sintomas_gerais?: string[];
-  critérios?: string;
-  entrevista_clínica?: string[];
-  análise_funcional?: string[];
-  [key: string]: unknown;
-}
-
-interface Avaliacao {
-  [key: string]: AvaliacaoItem;
-}
-
-interface ReferenciaNormativa {
-  artigo_dsm?: string;
-  [key: string]: unknown;
-}
-
-interface RespostaEstruturada {
-  context?: string;
-  avaliação?: Avaliacao;
-  referência_normativa?: ReferenciaNormativa;
-  considerações_finais?: string;
-  [key: string]: unknown;
-}
-
 interface WebhookResponse {
-  response?: string | RespostaEstruturada;
+  response?: string;
   error?: string;
   message?: string;
   output?: string;
@@ -48,7 +22,7 @@ type WebhookData =
   | string 
   | Record<string, unknown>
   | Array<Record<string, unknown> | string>
-  | { output?: string; response?: string | RespostaEstruturada; message?: string; error?: string; };
+  | { output?: string; response?: string; message?: string; error?: string; };
 
 const WEBHOOK_URL = 'https://primary-production-c25e.up.railway.app/webhook/cf944c6e-132b-4309-9646-967e221b6d82';
 const MAX_RETRIES = 2;
@@ -85,10 +59,6 @@ export default function Chat() {
             return { response: primeiroItem.response };
           if ('message' in primeiroItem && typeof primeiroItem.message === 'string') 
             return { response: primeiroItem.message };
-          if ('text' in primeiroItem && typeof primeiroItem.text === 'string')
-            return { response: primeiroItem.text };
-          if ('content' in primeiroItem && typeof primeiroItem.content === 'string')
-            return { response: primeiroItem.content };
         }
         if (typeof primeiroItem === 'string') return { response: primeiroItem };
         console.log('Não conseguiu extrair resposta do array:', primeiroItem);
@@ -107,42 +77,26 @@ export default function Chat() {
     }
 
     // Caso 3: Formato padrão
-    if (typeof data === 'object' && data !== null) {
-      // Verifica se é o formato estruturado específico
-      if ('response' in data && typeof data.response === 'object' && data.response !== null) {
-        console.log('Detectado formato estruturado específico');
-        return { response: data.response as RespostaEstruturada };
-      }
-      
-      if ('response' in data && typeof data.response === 'string') 
-        return { response: data.response };
-      
-      if ('output' in data && typeof data.output === 'string') 
-        return { response: data.output };
-      
-      if ('message' in data && typeof data.message === 'string') 
-        return { response: data.message };
-      
-      if ('text' in data && typeof data.text === 'string')
-        return { response: data.text };
-      
-      if ('content' in data && typeof data.content === 'string')
-        return { response: data.content };
-      
-      // Caso especial: objeto com uma única propriedade que é uma string
-      const keys = Object.keys(data);
-      if (keys.length === 1) {
-        const key = keys[0];
-        if (typeof data === 'object' && data !== null) {
-          const value = (data as Record<string, unknown>)[key];
-          if (typeof value === 'string') {
-            return { response: value };
-          }
-        }
+    if (typeof data === 'object' && data !== null && 'response' in data && 
+        typeof data.response === 'string') {
+      return { response: data.response };
+    }
+
+    // Caso 4: Formato alternativo
+    if (typeof data === 'object' && data !== null && 'output' in data && 
+        typeof data.output === 'string') {
+      return { response: data.output };
+    }
+
+    // Caso 5: Objeto simples
+    if (typeof data === 'object' && data !== null && Object.keys(data).length === 1) {
+      const valor = Object.values(data)[0];
+      if (typeof valor === 'string') {
+        return { response: valor };
       }
     }
 
-    // Caso 4: String direta
+    // Caso 6: String direta
     if (typeof data === 'string') {
       return { response: data };
     }
@@ -167,64 +121,6 @@ export default function Chat() {
     });
   };
 
-  // Função para formatar a resposta estruturada de forma amigável
-  const formatarRespostaEstruturada = (resposta: RespostaEstruturada): string => {
-    let textoFormatado = '';
-    
-    // Adiciona o contexto se existir
-    if (resposta.context) {
-      textoFormatado += `**Contexto:**\n${resposta.context}\n\n`;
-    }
-    
-    // Adiciona a avaliação se existir
-    if (resposta.avaliação) {
-      textoFormatado += `**Avaliação:**\n`;
-      
-      // Processa cada item da avaliação
-      Object.entries(resposta.avaliação).forEach(([chave, item]) => {
-        if (item.sintomas_gerais && item.sintomas_gerais.length > 0) {
-          textoFormatado += `\n**Sintomas Gerais:**\n`;
-          item.sintomas_gerais.forEach(sintoma => {
-            textoFormatado += `- ${sintoma}\n`;
-          });
-        }
-        
-        if (item.critérios) {
-          textoFormatado += `\n**Critérios:**\n${item.critérios}\n`;
-        }
-        
-        if (item.entrevista_clínica && item.entrevista_clínica.length > 0) {
-          textoFormatado += `\n**Entrevista Clínica:**\n`;
-          item.entrevista_clínica.forEach(passo => {
-            textoFormatado += `- ${passo}\n`;
-          });
-        }
-        
-        if (item.análise_funcional && item.análise_funcional.length > 0) {
-          textoFormatado += `\n**Análise Funcional:**\n`;
-          item.análise_funcional.forEach(análise => {
-            textoFormatado += `- ${análise}\n`;
-          });
-        }
-      });
-    }
-    
-    // Adiciona a referência normativa se existir
-    if (resposta.referência_normativa) {
-      textoFormatado += `\n**Referência Normativa:**\n`;
-      if (resposta.referência_normativa.artigo_dsm) {
-        textoFormatado += `${resposta.referência_normativa.artigo_dsm}\n`;
-      }
-    }
-    
-    // Adiciona as considerações finais se existirem
-    if (resposta.considerações_finais) {
-      textoFormatado += `\n**Considerações Finais:**\n${resposta.considerações_finais}\n`;
-    }
-    
-    return textoFormatado || JSON.stringify(resposta, null, 2);
-  };
-
   // Função melhorada para enviar mensagens para o webhook
   const enviarParaWebhook = async (mensagem: string): Promise<WebhookResponse> => {
     console.log('Iniciando envio para webhook:', mensagem);
@@ -234,7 +130,7 @@ export default function Chat() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json, text/plain, */*',
+        'Accept': 'application/json, text/plain',
       },
       body: JSON.stringify({
         message: mensagem,
@@ -247,7 +143,6 @@ export default function Chat() {
       // Tenta com retentativas
       const response = await retryWithDelay(() => executarFetch(), MAX_RETRIES);
       console.log('Resposta do webhook obtida, status:', response.status);
-      console.log('Headers da resposta:', Object.fromEntries([...response.headers.entries()]));
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -271,18 +166,14 @@ export default function Chat() {
 
       // Verifica o tipo de conteúdo da resposta
       const contentType = response.headers.get('content-type');
-      console.log('Content-Type da resposta:', contentType);
+      const isJson = contentType && contentType.includes('application/json');
       
       // Converte a resposta em texto primeiro
       const responseText = await response.text();
-      console.log('Texto da resposta do webhook (primeiros 100 caracteres):', responseText.substring(0, 100));
+      console.log('Texto da resposta do webhook:', responseText);
       
-      // Verifica se é texto puro (não JSON)
-      const isPlainText = !responseText.trim().startsWith('{') && 
-                          !responseText.trim().startsWith('[') && 
-                          !responseText.trim().startsWith('"');
-      
-      if (isPlainText) {
+      // Se a resposta não é JSON ou não parece JSON, retorna diretamente como texto
+      if (!isJson && !responseText.trim().startsWith('{') && !responseText.trim().startsWith('[')) {
         console.log('Resposta detectada como texto puro, não JSON');
         return { response: responseText.trim() };
       }
@@ -343,9 +234,7 @@ export default function Chat() {
         if (webhookResponse.response) {
           const assistantMessage = { 
             role: 'assistant' as const, 
-            content: typeof webhookResponse.response === 'string' 
-              ? webhookResponse.response 
-              : formatarRespostaEstruturada(webhookResponse.response)
+            content: webhookResponse.response 
           };
           setMessages(prev => [...prev, assistantMessage]);
         }
@@ -355,9 +244,7 @@ export default function Chat() {
       if (webhookResponse.response) {
         const assistantMessage = { 
           role: 'assistant' as const, 
-          content: typeof webhookResponse.response === 'string' 
-            ? webhookResponse.response 
-            : formatarRespostaEstruturada(webhookResponse.response)
+          content: webhookResponse.response 
         };
         setMessages(prev => [...prev, assistantMessage]);
       } else if (webhookResponse.data) {
