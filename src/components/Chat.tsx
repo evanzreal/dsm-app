@@ -59,6 +59,10 @@ export default function Chat() {
             return { response: primeiroItem.response };
           if ('message' in primeiroItem && typeof primeiroItem.message === 'string') 
             return { response: primeiroItem.message };
+          if ('text' in primeiroItem && typeof primeiroItem.text === 'string')
+            return { response: primeiroItem.text };
+          if ('content' in primeiroItem && typeof primeiroItem.content === 'string')
+            return { response: primeiroItem.content };
         }
         if (typeof primeiroItem === 'string') return { response: primeiroItem };
         console.log('Não conseguiu extrair resposta do array:', primeiroItem);
@@ -77,26 +81,36 @@ export default function Chat() {
     }
 
     // Caso 3: Formato padrão
-    if (typeof data === 'object' && data !== null && 'response' in data && 
-        typeof data.response === 'string') {
-      return { response: data.response };
-    }
-
-    // Caso 4: Formato alternativo
-    if (typeof data === 'object' && data !== null && 'output' in data && 
-        typeof data.output === 'string') {
-      return { response: data.output };
-    }
-
-    // Caso 5: Objeto simples
-    if (typeof data === 'object' && data !== null && Object.keys(data).length === 1) {
-      const valor = Object.values(data)[0];
-      if (typeof valor === 'string') {
-        return { response: valor };
+    if (typeof data === 'object' && data !== null) {
+      if ('response' in data && typeof data.response === 'string') 
+        return { response: data.response };
+      
+      if ('output' in data && typeof data.output === 'string') 
+        return { response: data.output };
+      
+      if ('message' in data && typeof data.message === 'string') 
+        return { response: data.message };
+      
+      if ('text' in data && typeof data.text === 'string')
+        return { response: data.text };
+      
+      if ('content' in data && typeof data.content === 'string')
+        return { response: data.content };
+      
+      // Caso especial: objeto com uma única propriedade que é uma string
+      const keys = Object.keys(data);
+      if (keys.length === 1) {
+        const key = keys[0];
+        if (typeof data === 'object' && data !== null) {
+          const value = (data as Record<string, unknown>)[key];
+          if (typeof value === 'string') {
+            return { response: value };
+          }
+        }
       }
     }
 
-    // Caso 6: String direta
+    // Caso 4: String direta
     if (typeof data === 'string') {
       return { response: data };
     }
@@ -130,7 +144,7 @@ export default function Chat() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json, text/plain',
+        'Accept': 'application/json, text/plain, */*',
       },
       body: JSON.stringify({
         message: mensagem,
@@ -143,6 +157,7 @@ export default function Chat() {
       // Tenta com retentativas
       const response = await retryWithDelay(() => executarFetch(), MAX_RETRIES);
       console.log('Resposta do webhook obtida, status:', response.status);
+      console.log('Headers da resposta:', Object.fromEntries([...response.headers.entries()]));
       
       if (!response.ok) {
         const errorText = await response.text();
@@ -166,14 +181,18 @@ export default function Chat() {
 
       // Verifica o tipo de conteúdo da resposta
       const contentType = response.headers.get('content-type');
-      const isJson = contentType && contentType.includes('application/json');
+      console.log('Content-Type da resposta:', contentType);
       
       // Converte a resposta em texto primeiro
       const responseText = await response.text();
-      console.log('Texto da resposta do webhook:', responseText);
+      console.log('Texto da resposta do webhook (primeiros 100 caracteres):', responseText.substring(0, 100));
       
-      // Se a resposta não é JSON ou não parece JSON, retorna diretamente como texto
-      if (!isJson && !responseText.trim().startsWith('{') && !responseText.trim().startsWith('[')) {
+      // Verifica se é texto puro (não JSON)
+      const isPlainText = !responseText.trim().startsWith('{') && 
+                          !responseText.trim().startsWith('[') && 
+                          !responseText.trim().startsWith('"');
+      
+      if (isPlainText) {
         console.log('Resposta detectada como texto puro, não JSON');
         return { response: responseText.trim() };
       }
