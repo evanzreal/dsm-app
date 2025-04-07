@@ -9,8 +9,34 @@ interface Message {
   content: string;
 }
 
+// Interfaces para representar a estrutura exata da resposta do webhook
+interface AvaliacaoItem {
+  sintomas_gerais?: string[];
+  critérios?: string;
+  entrevista_clínica?: string[];
+  análise_funcional?: string[];
+  [key: string]: unknown;
+}
+
+interface Avaliacao {
+  [key: string]: AvaliacaoItem;
+}
+
+interface ReferenciaNormativa {
+  artigo_dsm?: string;
+  [key: string]: unknown;
+}
+
+interface RespostaEstruturada {
+  context?: string;
+  avaliação?: Avaliacao;
+  referência_normativa?: ReferenciaNormativa;
+  considerações_finais?: string;
+  [key: string]: unknown;
+}
+
 interface WebhookResponse {
-  response?: string;
+  response?: string | RespostaEstruturada;
   error?: string;
   message?: string;
   output?: string;
@@ -22,7 +48,7 @@ type WebhookData =
   | string 
   | Record<string, unknown>
   | Array<Record<string, unknown> | string>
-  | { output?: string; response?: string; message?: string; error?: string; };
+  | { output?: string; response?: string | RespostaEstruturada; message?: string; error?: string; };
 
 const WEBHOOK_URL = 'https://primary-production-c25e.up.railway.app/webhook-test/cf944c6e-132b-4309-9646-967e221b6d82';
 const MAX_RETRIES = 2;
@@ -82,6 +108,12 @@ export default function Chat() {
 
     // Caso 3: Formato padrão
     if (typeof data === 'object' && data !== null) {
+      // Verifica se é o formato estruturado específico
+      if ('response' in data && typeof data.response === 'object' && data.response !== null) {
+        console.log('Detectado formato estruturado específico');
+        return { response: data.response as RespostaEstruturada };
+      }
+      
       if ('response' in data && typeof data.response === 'string') 
         return { response: data.response };
       
@@ -133,6 +165,64 @@ export default function Chat() {
       return new Promise<void>(resolve => setTimeout(resolve, RETRY_DELAY))
         .then(() => retryWithDelay(fn, retries - 1));
     });
+  };
+
+  // Função para formatar a resposta estruturada de forma amigável
+  const formatarRespostaEstruturada = (resposta: RespostaEstruturada): string => {
+    let textoFormatado = '';
+    
+    // Adiciona o contexto se existir
+    if (resposta.context) {
+      textoFormatado += `**Contexto:**\n${resposta.context}\n\n`;
+    }
+    
+    // Adiciona a avaliação se existir
+    if (resposta.avaliação) {
+      textoFormatado += `**Avaliação:**\n`;
+      
+      // Processa cada item da avaliação
+      Object.entries(resposta.avaliação).forEach(([chave, item]) => {
+        if (item.sintomas_gerais && item.sintomas_gerais.length > 0) {
+          textoFormatado += `\n**Sintomas Gerais:**\n`;
+          item.sintomas_gerais.forEach(sintoma => {
+            textoFormatado += `- ${sintoma}\n`;
+          });
+        }
+        
+        if (item.critérios) {
+          textoFormatado += `\n**Critérios:**\n${item.critérios}\n`;
+        }
+        
+        if (item.entrevista_clínica && item.entrevista_clínica.length > 0) {
+          textoFormatado += `\n**Entrevista Clínica:**\n`;
+          item.entrevista_clínica.forEach(passo => {
+            textoFormatado += `- ${passo}\n`;
+          });
+        }
+        
+        if (item.análise_funcional && item.análise_funcional.length > 0) {
+          textoFormatado += `\n**Análise Funcional:**\n`;
+          item.análise_funcional.forEach(análise => {
+            textoFormatado += `- ${análise}\n`;
+          });
+        }
+      });
+    }
+    
+    // Adiciona a referência normativa se existir
+    if (resposta.referência_normativa) {
+      textoFormatado += `\n**Referência Normativa:**\n`;
+      if (resposta.referência_normativa.artigo_dsm) {
+        textoFormatado += `${resposta.referência_normativa.artigo_dsm}\n`;
+      }
+    }
+    
+    // Adiciona as considerações finais se existirem
+    if (resposta.considerações_finais) {
+      textoFormatado += `\n**Considerações Finais:**\n${resposta.considerações_finais}\n`;
+    }
+    
+    return textoFormatado || JSON.stringify(resposta, null, 2);
   };
 
   // Função melhorada para enviar mensagens para o webhook
@@ -253,7 +343,9 @@ export default function Chat() {
         if (webhookResponse.response) {
           const assistantMessage = { 
             role: 'assistant' as const, 
-            content: webhookResponse.response 
+            content: typeof webhookResponse.response === 'string' 
+              ? webhookResponse.response 
+              : formatarRespostaEstruturada(webhookResponse.response)
           };
           setMessages(prev => [...prev, assistantMessage]);
         }
@@ -263,7 +355,9 @@ export default function Chat() {
       if (webhookResponse.response) {
         const assistantMessage = { 
           role: 'assistant' as const, 
-          content: webhookResponse.response 
+          content: typeof webhookResponse.response === 'string' 
+            ? webhookResponse.response 
+            : formatarRespostaEstruturada(webhookResponse.response)
         };
         setMessages(prev => [...prev, assistantMessage]);
       } else if (webhookResponse.data) {
